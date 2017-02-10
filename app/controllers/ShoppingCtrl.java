@@ -4,6 +4,7 @@ import controllers.security.CheckIfCustomer;
 import controllers.security.Secured;
 import models.products.Product;
 import models.shopping.Basket;
+import models.shopping.OrderItem;
 import models.shopping.ShopOrder;
 import models.users.Customer;
 import models.users.User;
@@ -32,7 +33,7 @@ public class ShoppingCtrl extends Controller {
     public Result addToBasket(Long id){
 
         //Find the product
-        Product p = Product.find.byId;
+        Product p = Product.find.byId(id);
 
         //Get basket for logged in customer
         Customer customer = (Customer)User.getLoggedIn(session().get("email"));
@@ -79,5 +80,76 @@ public class ShoppingCtrl extends Controller {
         ShopOrder order = ShopOrder.find.byId(id);
         return ok(orderConfirmed.render(getCurrentUser(), order));
     }
+
+    @Transactional
+    public Result showBasket() {
+        return ok(basket.render(getCurrentUser()));
+    }
+
+    // Add an item to the basket
+    @Transactional
+    public Result addOne(Long itemId) {
+
+        // Get the order item
+        OrderItem item = OrderItem.find.byId(itemId);
+        // Increment quantity
+        item.increaseQty();
+        // Save
+        item.update();
+        // Show updated basket
+        return redirect(routes.ShoppingCtrl.showBasket());
+    }
+
+    @Transactional
+    public Result removeOne(Long itemId) {
+
+        // Get the order item
+        OrderItem item = OrderItem.find.byId(itemId);
+        // Get user
+        Customer c = getCurrentUser();
+        // Call basket remove item method
+        c.getBasket().removeItem(item);
+        c.getBasket().update();
+        // back to basket
+        return ok(basket.render(c));
+    }
+
+    @Transactional
+    public Result placeOrder() {
+        Customer c = getCurrentUser();
+
+        //Create an order instance
+        ShopOrder order = new ShopOrder();
+
+        //Associate order with customer
+        order.setCustomer(c);
+
+        //Copy basket to order
+        order.setItems(c.getBasket().getBasketItems());
+
+        //save the order now to generate a new id for this order
+        order.save();
+
+        //Move items from basket to order
+        for (OrderItem i : order.getItems()) {
+            //Associate with order
+            i.setOrder(order);
+            //remove from basket
+            i.setBasket(null);
+            //update item
+            i.update();
+        }
+
+        //Update the order
+        order.update();
+
+        // clear and update the shopping basket
+        c.getBasket().setBasketItems(null);
+        c.getBasket().update();
+
+        //Show order confirm view
+        return ok(orderConfirmed.render(c,order));
+    }
+
 
 }

@@ -4,10 +4,8 @@ import com.avaje.ebean.Model;
 import models.products.Product;
 import models.users.Customer;
 
-import javax.persistence.CascadeType;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
+import javax.persistence.*;
+import java.util.Iterator;
 import java.util.List;
 
 
@@ -21,7 +19,7 @@ public class Basket extends Model {
     @OneToMany(mappedBy = "basket", cascade = CascadeType.PERSIST)
     private List<OrderItem> basketItems;
     
-
+    @OneToOne
     private Customer customer;
 
     // Default constructor
@@ -71,8 +69,34 @@ public class Basket extends Model {
         }
         return total;
     }
-	
-	//Generic query helper
+
+    public void removeItem(OrderItem item) {
+
+        // Using an iterator ensures 'safe' removal of list objects
+        // Removal of list items is unreliable as index can change if an item is added or removed elsewhere
+        // iterator works with an object reference which does not change
+        for (Iterator<OrderItem> iter = basketItems.iterator(); iter.hasNext();) {
+            OrderItem i = iter.next();
+            if (i.getId().equals(item.getId()))
+            {
+                // If more than one of these items in the basket then decrement
+                if (i.getQuantity() > 1 ) {
+                    i.decreaseQty();
+                }
+                // If only one left, remove this item from the basket (via the iterator)
+                else {
+                    // delete object from db
+                    i.delete();
+                    // remove object from list
+                    iter.remove();
+                    break;
+                }
+            }
+        }
+    }
+
+
+    //Generic query helper
     public static Finder<Long,Basket> find = new Finder<Long,Basket>(Basket.class);
 
     //Find all Products in the database
